@@ -42,6 +42,9 @@
 
 ---
 
+> [!NOTE]
+> **This is a fork.** It removes the no-opt-out benchmark upload that sends results and hardware info to the omlx.ai community site.
+
 <p align="center">
   <img src="docs/images/omlx_dashboard.png" alt="oMLX Admin Dashboard" width="800">
 </p>

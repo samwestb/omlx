@@ -446,11 +446,6 @@
             benchShowText: false,
             benchCopied: false,
             benchTip: null,
-            benchDeviceInfo: null,
-            benchUploadResults: [],
-            benchUploadDone: null,
-            benchUploading: false,
-            benchUploadSkipped: null,  // { features: [...] } when upload was skipped due to experimental features
             // { bench_id, model_id } when the server reports a running bench
             // that is NOT the one this tab is displaying. Drives the "another
             // bench is running" banner + disables Start so the user doesn't
@@ -632,7 +627,6 @@
                     this.stopOQRefresh();
                 }
                 if (value === 'bench') {
-                    if (!this.benchDeviceInfo) await this.loadBenchDeviceInfo();
                     await this.loadBenchState();
                     await this.loadAccState();
                 }
@@ -2793,11 +2787,6 @@
                     .filter(([_, v]) => v)
                     .map(([k, _]) => parseInt(k));
 
-                // Load device info if not loaded yet
-                if (!this.benchDeviceInfo) {
-                    this.loadBenchDeviceInfo();
-                }
-
                 // Reset state
                 this.benchRunning = true;
                 this.benchProgress = null;
@@ -2805,10 +2794,6 @@
                 this.benchBatchResults = [];
                 this.benchError = '';
                 this.benchBenchId = null;
-                this.benchUploadResults = [];
-                this.benchUploadDone = null;
-                this.benchUploading = false;
-                this.benchUploadSkipped = null;
 
                 try {
                     const response = await fetch('/admin/api/bench/start', {
@@ -2885,33 +2870,7 @@
                                 }
                             }
                         } else if (data.type === 'done') {
-                            // Benchmark tests done, uploading starts
-                            this.benchUploading = true;
-                            this.benchProgress = {
-                                phase: 'upload',
-                                message: 'Uploading to community benchmarks...',
-                                current: 0,
-                                total: 0,
-                            };
-                            this.loadModels();
-                        } else if (data.type === 'upload') {
-                            // Dedupe on replay: upload entries are unique by context_length.
-                            const exists = this.benchUploadResults.some(
-                                r => r.context_length === data.data.context_length
-                            );
-                            if (!exists) {
-                                this.benchUploadResults = [...this.benchUploadResults, data.data];
-                            }
-                        } else if (data.type === 'upload_done') {
-                            this.benchUploadDone = data.data;
-                            this.benchUploading = false;
-                            this.benchRunning = false;
-                            this.benchProgress = null;
-                            es.close();
-                            this.benchEventSource = null;
-                        } else if (data.type === 'upload_skipped') {
-                            this.benchUploadSkipped = { features: data.features || [] };
-                            this.benchUploading = false;
+                            // Benchmark complete — this is the terminal event.
                             this.benchRunning = false;
                             this.benchProgress = null;
                             es.close();
@@ -3062,17 +3021,6 @@
                 }
             },
 
-            async loadBenchDeviceInfo() {
-                try {
-                    const resp = await fetch('/admin/api/device-info');
-                    if (resp.ok) {
-                        this.benchDeviceInfo = await resp.json();
-                    }
-                } catch (err) {
-                    console.error('Failed to load device info:', err);
-                }
-            },
-
             async loadBenchState() {
                 // Discover an in-progress throughput run on tab/page load so
                 // a second tab (or a refresh) can attach to its SSE stream
@@ -3143,9 +3091,6 @@
                 this.benchRunning = true;
                 this.benchSingleResults = [];
                 this.benchBatchResults = [];
-                this.benchUploadResults = [];
-                this.benchUploadDone = null;
-                this.benchUploadSkipped = null;
                 this.benchProgress = null;
                 this.benchError = '';
                 this.connectBenchSSE(other.bench_id);
@@ -3165,7 +3110,6 @@
                 this.mainTab = 'bench';
                 this.syncTabStateToUrl();
                 if (tab === 'throughput') {
-                    this.loadBenchDeviceInfo();
                     this.loadBenchState();
                 }
             },
